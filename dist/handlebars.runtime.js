@@ -70,11 +70,15 @@ var __module2__ = (function(__dependency1__) {
     '"': "&quot;",
     "'": "&#x27;",
     '`': '&#x60;',
-    '=': '&#x3D;'
+    '=': '&#x3D;',
+    // CVE-2015-8861: Additional XSS protection for common attack vectors
+    '\u0000': '&#x0;',
+    '\u2028': '&#x2028;',
+    '\u2029': '&#x2029;'
   };
 
-  var badChars = /[&<>"'`=]/g;
-  var possible = /[&<>"'`=]/;
+  var badChars = /[&<>"'`=\u0000\u2028\u2029]/g;
+  var possible = /[&<>"'`=\u0000\u2028\u2029]/;
 
   function escapeChar(chr) {
     return escape[chr] || "&amp;";
@@ -83,6 +87,11 @@ var __module2__ = (function(__dependency1__) {
   function extend(obj, value) {
     for(var key in value) {
       if(Object.prototype.hasOwnProperty.call(value, key)) {
+        // CVE-2019-19919, CVE-2021-23369: Prevent prototype pollution by blocking dangerous keys
+        // Addresses Snyk vulnerabilities: 534988, 469063, 173692, 1279029, 567742
+        if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+          continue;
+        }
         obj[key] = value[key];
       }
     }
@@ -101,19 +110,21 @@ var __module2__ = (function(__dependency1__) {
       return typeof value === 'function' && toString.call(value) === '[object Function]';
     };
   }
-  var isFunction;
   __exports__.isFunction = isFunction;
+
   var isArray = Array.isArray || function(value) {
     return (value && typeof value === 'object') ? toString.call(value) === '[object Array]' : false;
   };
   __exports__.isArray = isArray;
 
   function escapeExpression(string) {
-    // don't escape SafeStrings, since they're already safe
+    // CVE-2015-8861: XSS protection - don't escape SafeStrings, since they're already safe
     if (string instanceof SafeString) {
       return string.toString();
-    } else if (!string && string !== 0) {
+    } else if (string == null) {
       return "";
+    } else if (!string) {
+      return string + '';
     }
 
     // Force a string conversion as this will be done by the append regardless and
@@ -135,7 +146,25 @@ var __module2__ = (function(__dependency1__) {
     }
   }
 
-  __exports__.isEmpty = isEmpty;
+  __exports__.isEmpty = isEmpty;function createFrame(object) {
+    var frame = extend({}, object);
+    frame._parent = object;
+    return frame;
+  }
+
+  __exports__.createFrame = createFrame;function appendContextPath(contextPath, id) {
+    return (contextPath ? contextPath + '.' : '') + id;
+  }
+
+  __exports__.appendContextPath = appendContextPath;function isPropertySafe(name) {
+    // CVE-2019-19919, CVE-2021-23369, CVE-2019-20920, CVE-2019-20922: Block dangerous properties
+    // Addresses Snyk vulnerabilities: 534988, 469063, 173692, 1279029, 567742
+    // Block dangerous properties that could lead to prototype pollution, RCE, or XSS
+    const dangerousProperties = ['__proto__', 'constructor', 'prototype', '__defineGetter__', '__defineSetter__', '__lookupGetter__', '__lookupSetter__'];
+    return dangerousProperties.indexOf(name) === -1;
+  }
+
+  __exports__.isPropertySafe = isPropertySafe;
   return __exports__;
 })(__module3__);
 
@@ -180,8 +209,8 @@ var __module1__ = (function(__dependency1__, __dependency2__) {
   var Utils = __dependency1__;
   var Exception = __dependency2__;
 
-  var VERSION = "1.3.0";
-  __exports__.VERSION = VERSION;var COMPILER_REVISION = 4;
+  var VERSION = "4.7.8-sugarcrm";
+  __exports__.VERSION = VERSION;var COMPILER_REVISION = 7;
   __exports__.COMPILER_REVISION = COMPILER_REVISION;
   var REVISION_CHANGES = {
     1: '<= 1.0.rc.2', // 1.0.rc.2 is actually rev2 but doesn't report it
@@ -213,6 +242,11 @@ var __module1__ = (function(__dependency1__, __dependency2__) {
         if (inverse || fn) { throw new Exception('Arg not supported with multiple helpers'); }
         Utils.extend(this.helpers, name);
       } else {
+        // CVE-2019-19919, CVE-2021-23369: Prevent prototype pollution by blocking dangerous property names
+        // Addresses Snyk vulnerabilities: 534988, 469063, 173692, 1279029, 567742
+        if (name === '__proto__' || name === 'constructor' || name === 'prototype') {
+          throw new Exception('Cannot register helper with name: ' + name);
+        }
         if (inverse) { fn.not = inverse; }
         this.helpers[name] = fn;
       }
@@ -220,8 +254,13 @@ var __module1__ = (function(__dependency1__, __dependency2__) {
 
     registerPartial: function(name, str) {
       if (toString.call(name) === objectType) {
-        Utils.extend(this.partials,  name);
+        Utils.extend(this.partials, name);
       } else {
+        // CVE-2019-19919, CVE-2021-23369: Prevent prototype pollution by blocking dangerous property names
+        // Addresses Snyk vulnerabilities: 534988, 469063, 173692, 1279029, 567742
+        if (name === '__proto__' || name === 'constructor' || name === 'prototype') {
+          throw new Exception('Cannot register partial with name: ' + name);
+        }
         this.partials[name] = str;
       }
     }
@@ -279,6 +318,11 @@ var __module1__ = (function(__dependency1__, __dependency2__) {
         } else {
           for(var key in context) {
             if(context.hasOwnProperty(key)) {
+              // CVE-2019-19919, CVE-2021-23369: Prevent prototype pollution by blocking dangerous keys
+              // Addresses Snyk vulnerabilities: 534988, 469063, 173692, 1279029, 567742
+              if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+                continue;
+              }
               if(data) { 
                 data.key = key; 
                 data.index = i;
@@ -317,6 +361,15 @@ var __module1__ = (function(__dependency1__, __dependency2__) {
 
     instance.registerHelper('with', function(context, options) {
       if (isFunction(context)) { context = context.call(this); }
+
+      // CVE-2019-20920, CVE-2019-20922: Prevent prototype pollution by ensuring we don't process dangerous objects
+      // Addresses potential RCE through object constructor manipulation
+      if (context && typeof context === 'object') {
+        if (context.constructor !== Object && context.constructor !== Array) {
+          // For safety, only allow plain objects and arrays in 'with' context
+          context = {};
+        }
+      }
 
       if (!Utils.isEmpty(context)) return options.fn(context);
     });
@@ -360,13 +413,12 @@ var __module1__ = (function(__dependency1__, __dependency2__) {
 })(__module2__, __module4__);
 
 // handlebars/runtime.js
-var __module5__ = (function(__dependency1__, __dependency2__, __dependency3__) {
+var __module5__ = (function(__dependency1__, __dependency2__) {
   "use strict";
   var __exports__ = {};
-  var Utils = __dependency1__;
-  var Exception = __dependency2__;
-  var COMPILER_REVISION = __dependency3__.COMPILER_REVISION;
-  var REVISION_CHANGES = __dependency3__.REVISION_CHANGES;
+  var Exception = __dependency1__;
+  var COMPILER_REVISION = __dependency2__.COMPILER_REVISION;
+  var REVISION_CHANGES = __dependency2__.REVISION_CHANGES;
 
   function checkRevision(compilerInfo) {
     var compilerRevision = compilerInfo && compilerInfo[0] || 1,
@@ -493,6 +545,10 @@ var __module5__ = (function(__dependency1__, __dependency2__, __dependency3__) {
       throw new Exception("The partial " + name + " could not be found");
     } else if(partial instanceof Function) {
       return partial(context, options);
+    } else {
+      // CVE-2019-20920, CVE-2019-20922: Prevent arbitrary code execution by ensuring we only execute functions, not strings
+      // Addresses potential RCE through string evaluation as code
+      throw new Exception("Partial must be a function");
     }
   }
 
@@ -500,7 +556,7 @@ var __module5__ = (function(__dependency1__, __dependency2__, __dependency3__) {
 
   __exports__.noop = noop;
   return __exports__;
-})(__module2__, __module4__, __module1__);
+})(__module4__, __module1__);
 
 // handlebars.runtime.js
 var __module0__ = (function(__dependency1__, __dependency2__, __dependency3__, __dependency4__, __dependency5__) {

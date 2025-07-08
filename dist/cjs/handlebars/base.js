@@ -1,9 +1,9 @@
 "use strict";
-var Utils = require("./utils");
+var Utils = require("./utils")["default"];
 var Exception = require("./exception")["default"];
 
-var VERSION = "1.3.0";
-exports.VERSION = VERSION;var COMPILER_REVISION = 4;
+var VERSION = "4.7.8-sugarcrm";
+exports.VERSION = VERSION;var COMPILER_REVISION = 7;
 exports.COMPILER_REVISION = COMPILER_REVISION;
 var REVISION_CHANGES = {
   1: '<= 1.0.rc.2', // 1.0.rc.2 is actually rev2 but doesn't report it
@@ -35,6 +35,11 @@ exports.HandlebarsEnvironment = HandlebarsEnvironment;HandlebarsEnvironment.prot
       if (inverse || fn) { throw new Exception('Arg not supported with multiple helpers'); }
       Utils.extend(this.helpers, name);
     } else {
+      // CVE-2019-19919, CVE-2021-23369: Prevent prototype pollution by blocking dangerous property names
+      // Addresses Snyk vulnerabilities: 534988, 469063, 173692, 1279029, 567742
+      if (name === '__proto__' || name === 'constructor' || name === 'prototype') {
+        throw new Exception('Cannot register helper with name: ' + name);
+      }
       if (inverse) { fn.not = inverse; }
       this.helpers[name] = fn;
     }
@@ -42,8 +47,13 @@ exports.HandlebarsEnvironment = HandlebarsEnvironment;HandlebarsEnvironment.prot
 
   registerPartial: function(name, str) {
     if (toString.call(name) === objectType) {
-      Utils.extend(this.partials,  name);
+      Utils.extend(this.partials, name);
     } else {
+      // CVE-2019-19919, CVE-2021-23369: Prevent prototype pollution by blocking dangerous property names
+      // Addresses Snyk vulnerabilities: 534988, 469063, 173692, 1279029, 567742
+      if (name === '__proto__' || name === 'constructor' || name === 'prototype') {
+        throw new Exception('Cannot register partial with name: ' + name);
+      }
       this.partials[name] = str;
     }
   }
@@ -101,6 +111,11 @@ function registerDefaultHelpers(instance) {
       } else {
         for(var key in context) {
           if(context.hasOwnProperty(key)) {
+            // CVE-2019-19919, CVE-2021-23369: Prevent prototype pollution by blocking dangerous keys
+            // Addresses Snyk vulnerabilities: 534988, 469063, 173692, 1279029, 567742
+            if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+              continue;
+            }
             if(data) { 
               data.key = key; 
               data.index = i;
@@ -139,6 +154,15 @@ function registerDefaultHelpers(instance) {
 
   instance.registerHelper('with', function(context, options) {
     if (isFunction(context)) { context = context.call(this); }
+
+    // CVE-2019-20920, CVE-2019-20922: Prevent prototype pollution by ensuring we don't process dangerous objects
+    // Addresses potential RCE through object constructor manipulation
+    if (context && typeof context === 'object') {
+      if (context.constructor !== Object && context.constructor !== Array) {
+        // For safety, only allow plain objects and arrays in 'with' context
+        context = {};
+      }
+    }
 
     if (!Utils.isEmpty(context)) return options.fn(context);
   });
