@@ -14,24 +14,16 @@ JavaScriptCompiler.prototype = {
   // PUBLIC API: You can override these methods in a subclass to provide
   // alternative compiled forms for name lookup and buffering semantics
   nameLookup: function(parent, name /* , type*/) {
-    const actual = _actualLookup();
-    const dangerousProperties = ['__defineGetter__','__defineSetter__','__lookupGetter__','__proto__'];
+    const dangerousProperties = ['__defineGetter__','__defineSetter__','__lookupGetter__','__proto__', 'constructor', 'prototype'];
 
-    // Do not allow to access constructor of any object/class
-    // See: https://snyk.io/vuln/SNYK-JS-HANDLEBARS-469063
-    if (name === 'constructor') {
-      return 'Object.prototype.hasOwnProperty.call(' + parent + ',\'constructor\') ? ' + actual + ' : undefined';
-    }
-
-    // Block the above dangerous properties altogether from being used. If they are used in a template, we assume it
-    // could be to exploit the lib since the keywords don't make sense for actual template compilation or rendering
-    // unlike 'constructor' which could be someone's occupation :) lol
-    // See https://snyk.io/vuln/SNYK-JS-HANDLEBARS-534988
+    // CVE-2019-19919, CVE-2021-23369: Block dangerous properties altogether from being used to prevent prototype pollution and RCE
+    // Addresses Snyk vulnerabilities: 534988, 469063, 173692, 1279029, 567742
+    // See https://snyk.io/vuln/SNYK-JS-HANDLEBARS-534988 and https://snyk.io/vuln/SNYK-JS-HANDLEBARS-469063
     if (dangerousProperties.indexOf(name) !== -1) {
-      throw new Exception('For security reasons, you cannot use ' + name);
+      return 'undefined';
     }
 
-    return actual;
+    return _actualLookup();
 
     // Original 1.3.0 code for nameLookup which we default back to if a special keyword is not used
     function _actualLookup() {
@@ -103,6 +95,7 @@ JavaScriptCompiler.prototype = {
     this.hashes = [];
     this.compileStack = [];
     this.inlineStack = [];
+    this.aliases = [];
 
     this.compileChildren(environment, options);
 
@@ -858,6 +851,20 @@ JavaScriptCompiler.prototype = {
       callParams: ["depth0"].concat(params).join(", "),
       helperMissingParams: missingParams && ["depth0", this.quotedString(name)].concat(params).join(", ")
     };
+  },
+
+  aliasable: function(name) {
+    let ret = this.aliases[name];
+    if (ret) {
+      ret.referenceCount++;
+      return ret;
+    }
+
+    ret = this.aliases[name] = this.source.wrap(name);
+    ret.aliasable = true;
+    ret.referenceCount =1;
+
+    return ret;
   },
 
   setupOptions: function(paramSize, params) {

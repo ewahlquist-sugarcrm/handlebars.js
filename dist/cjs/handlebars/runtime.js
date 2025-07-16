@@ -1,5 +1,4 @@
 "use strict";
-var Utils = require("./utils");
 var Exception = require("./exception")["default"];
 var COMPILER_REVISION = require("./base").COMPILER_REVISION;
 var REVISION_CHANGES = require("./base").REVISION_CHANGES;
@@ -129,6 +128,10 @@ exports.program = program;function invokePartial(partial, name, context, helpers
     throw new Exception("The partial " + name + " could not be found");
   } else if(partial instanceof Function) {
     return partial(context, options);
+  } else {
+    // CVE-2019-20920, CVE-2019-20922: Prevent arbitrary code execution by ensuring we only execute functions, not strings
+    // Addresses potential RCE through string evaluation as code
+    throw new Exception("Partial must be a function");
   }
 }
 
