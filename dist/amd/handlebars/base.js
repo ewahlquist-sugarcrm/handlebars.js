@@ -5,7 +5,7 @@ define(
     var Utils = __dependency1__;
     var Exception = __dependency2__["default"];
 
-    var VERSION = "1.3.0";
+    var VERSION = "4.7.9-sugarcrm";
     __exports__.VERSION = VERSION;var COMPILER_REVISION = 4;
     __exports__.COMPILER_REVISION = COMPILER_REVISION;
     var REVISION_CHANGES = {
@@ -38,6 +38,11 @@ define(
           if (inverse || fn) { throw new Exception('Arg not supported with multiple helpers'); }
           Utils.extend(this.helpers, name);
         } else {
+          // CVE-2019-19919, CVE-2021-23369: Prevent prototype pollution by blocking dangerous property names
+          // Addresses Snyk vulnerabilities: 534988, 469063, 173692, 1279029, 567742
+          if (name === '__proto__' || name === 'constructor' || name === 'prototype') {
+            throw new Exception('Cannot register helper with name: ' + name);
+          }
           if (inverse) { fn.not = inverse; }
           this.helpers[name] = fn;
         }
@@ -45,8 +50,13 @@ define(
 
       registerPartial: function(name, str) {
         if (toString.call(name) === objectType) {
-          Utils.extend(this.partials,  name);
+          Utils.extend(this.partials, name);
         } else {
+          // CVE-2019-19919, CVE-2021-23369: Prevent prototype pollution by blocking dangerous property names
+          // Addresses Snyk vulnerabilities: 534988, 469063, 173692, 1279029, 567742
+          if (name === '__proto__' || name === 'constructor' || name === 'prototype') {
+            throw new Exception('Cannot register partial with name: ' + name);
+          }
           this.partials[name] = str;
         }
       }
@@ -104,6 +114,11 @@ define(
           } else {
             for(var key in context) {
               if(context.hasOwnProperty(key)) {
+                // CVE-2019-19919, CVE-2021-23369: Prevent prototype pollution by blocking dangerous keys
+                // Addresses Snyk vulnerabilities: 534988, 469063, 173692, 1279029, 567742
+                if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+                  continue;
+                }
                 if(data) { 
                   data.key = key; 
                   data.index = i;
@@ -142,6 +157,15 @@ define(
 
       instance.registerHelper('with', function(context, options) {
         if (isFunction(context)) { context = context.call(this); }
+
+        // CVE-2019-20920, CVE-2019-20922: Prevent prototype pollution by ensuring we don't process dangerous objects
+        // Addresses potential RCE through object constructor manipulation
+        if (context && typeof context === 'object') {
+          if (context.constructor !== Object && context.constructor !== Array) {
+            // For safety, only allow plain objects and arrays in 'with' context
+            context = {};
+          }
+        }
 
         if (!Utils.isEmpty(context)) return options.fn(context);
       });

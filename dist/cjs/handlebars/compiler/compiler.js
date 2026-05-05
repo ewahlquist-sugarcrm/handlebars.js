@@ -1,5 +1,6 @@
 "use strict";
 var Exception = require("../exception")["default"];
+var extend = require("../utils").extend;
 
 function Compiler() {}
 
@@ -81,7 +82,9 @@ Compiler.prototype = {
     this.depths = {list: []};
     this.options = options;
 
-    this.options.knownHelpers = extend(Object.create(null), {
+    var knownHelpers = this.options.knownHelpers || {};
+    this.options.knownHelpers = {};
+    extend(this.options.knownHelpers, {
       'helperMissing': true,
       'blockHelperMissing': true,
       'each': true,
@@ -89,7 +92,10 @@ Compiler.prototype = {
       'unless': true,
       'with': true,
       'log': true
-    }, this.options.knownHelpers);
+    });
+    if (knownHelpers) {
+      extend(this.options.knownHelpers, knownHelpers);
+    }
 
     return this.accept(program);
   },
@@ -443,15 +449,15 @@ exports.precompile = precompile;function compile(input, options, env) {
 
   // Validate input to prevent template injection attacks
   if (typeof input === 'string') {
-    // Block dangerous patterns that could lead to RCE
-    const dangerousPatterns = [
+    // CVE-2019-19919, CVE-2021-23369: Block dangerous patterns that could lead to RCE
+    var dangerousPatterns = [
       /\{\{\s*(__proto__|constructor|prototype)/,
       /\{\{\s*[^}]*\.(constructor|__proto__|prototype)/,
       /\{\{\s*[^}]*\[\s*["'](__proto__|constructor|prototype)["']\s*\]/
     ];
     
-    for (let pattern of dangerousPatterns) {
-      if (pattern.test(input)) {
+    for (var i = 0; i < dangerousPatterns.length; i++) {
+      if (dangerousPatterns[i].test(input)) {
         throw new Exception("Template contains dangerous pattern that could lead to security vulnerability");
       }
     }

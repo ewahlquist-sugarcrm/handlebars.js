@@ -1,6 +1,6 @@
 /*!
 
- handlebars v4.7.8-sugarcrm
+ handlebars v4.7.9-sugarcrm
 
 Copyright (C) 2011 by Yehuda Katz
 
@@ -160,7 +160,7 @@ var __module2__ = (function(__dependency1__) {
     // CVE-2019-19919, CVE-2021-23369, CVE-2019-20920, CVE-2019-20922: Block dangerous properties
     // Addresses Snyk vulnerabilities: 534988, 469063, 173692, 1279029, 567742
     // Block dangerous properties that could lead to prototype pollution, RCE, or XSS
-    const dangerousProperties = ['__proto__', 'constructor', 'prototype', '__defineGetter__', '__defineSetter__', '__lookupGetter__', '__lookupSetter__'];
+    var dangerousProperties = ['__proto__', 'constructor', 'prototype', '__defineGetter__', '__defineSetter__', '__lookupGetter__', '__lookupSetter__'];
     return dangerousProperties.indexOf(name) === -1;
   }
 
@@ -209,8 +209,8 @@ var __module1__ = (function(__dependency1__, __dependency2__) {
   var Utils = __dependency1__;
   var Exception = __dependency2__;
 
-  var VERSION = "4.7.8-sugarcrm";
-  __exports__.VERSION = VERSION;var COMPILER_REVISION = 7;
+  var VERSION = "4.7.9-sugarcrm";
+  __exports__.VERSION = VERSION;var COMPILER_REVISION = 4;
   __exports__.COMPILER_REVISION = COMPILER_REVISION;
   var REVISION_CHANGES = {
     1: '<= 1.0.rc.2', // 1.0.rc.2 is actually rev2 but doesn't report it
@@ -413,12 +413,13 @@ var __module1__ = (function(__dependency1__, __dependency2__) {
 })(__module2__, __module4__);
 
 // handlebars/runtime.js
-var __module5__ = (function(__dependency1__, __dependency2__) {
+var __module5__ = (function(__dependency1__, __dependency2__, __dependency3__) {
   "use strict";
   var __exports__ = {};
   var Exception = __dependency1__;
   var COMPILER_REVISION = __dependency2__.COMPILER_REVISION;
   var REVISION_CHANGES = __dependency2__.REVISION_CHANGES;
+  var Utils = __dependency3__;
 
   function checkRevision(compilerInfo) {
     var compilerRevision = compilerInfo && compilerInfo[0] || 1,
@@ -545,10 +546,12 @@ var __module5__ = (function(__dependency1__, __dependency2__) {
       throw new Exception("The partial " + name + " could not be found");
     } else if(partial instanceof Function) {
       return partial(context, options);
+    } else if (typeof partial === 'string') {
+      // String partials are compiled on-the-fly by invokePartialWrapper
+      return;
     } else {
-      // CVE-2019-20920, CVE-2019-20922: Prevent arbitrary code execution by ensuring we only execute functions, not strings
-      // Addresses potential RCE through string evaluation as code
-      throw new Exception("Partial must be a function");
+      // CVE-2019-20920: Prevent arbitrary code execution via non-string, non-function partials
+      throw new Exception("Partial must be a function or string");
     }
   }
 
@@ -556,7 +559,7 @@ var __module5__ = (function(__dependency1__, __dependency2__) {
 
   __exports__.noop = noop;
   return __exports__;
-})(__module4__, __module1__);
+})(__module4__, __module1__, __module2__);
 
 // handlebars.runtime.js
 var __module0__ = (function(__dependency1__, __dependency2__, __dependency3__, __dependency4__, __dependency5__) {

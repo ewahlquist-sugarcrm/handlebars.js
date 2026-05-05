@@ -1,11 +1,11 @@
 define(
-  ["./utils","./exception","./base","exports"],
+  ["./exception","./base","./utils","exports"],
   function(__dependency1__, __dependency2__, __dependency3__, __exports__) {
     "use strict";
-    var Utils = __dependency1__;
-    var Exception = __dependency2__["default"];
-    var COMPILER_REVISION = __dependency3__.COMPILER_REVISION;
-    var REVISION_CHANGES = __dependency3__.REVISION_CHANGES;
+    var Exception = __dependency1__["default"];
+    var COMPILER_REVISION = __dependency2__.COMPILER_REVISION;
+    var REVISION_CHANGES = __dependency2__.REVISION_CHANGES;
+    var Utils = __dependency3__;
 
     function checkRevision(compilerInfo) {
       var compilerRevision = compilerInfo && compilerInfo[0] || 1,
@@ -132,6 +132,12 @@ define(
         throw new Exception("The partial " + name + " could not be found");
       } else if(partial instanceof Function) {
         return partial(context, options);
+      } else if (typeof partial === 'string') {
+        // String partials are compiled on-the-fly by invokePartialWrapper
+        return;
+      } else {
+        // CVE-2019-20920: Prevent arbitrary code execution via non-string, non-function partials
+        throw new Exception("Partial must be a function or string");
       }
     }
 

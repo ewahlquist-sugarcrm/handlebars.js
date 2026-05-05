@@ -1,6 +1,6 @@
 /*!
 
- handlebars v4.7.8-sugarcrm
+ handlebars v4.7.9-sugarcrm
 
 Copyright (C) 2011 by Yehuda Katz
 
@@ -209,8 +209,8 @@ var __module2__ = (function(__dependency1__, __dependency2__) {
   var Utils = __dependency1__;
   var Exception = __dependency2__;
 
-  var VERSION = "4.7.8-sugarcrm";
-  __exports__.VERSION = VERSION;var COMPILER_REVISION = 7;
+  var VERSION = "4.7.9-sugarcrm";
+  __exports__.VERSION = VERSION;var COMPILER_REVISION = 4;
   __exports__.COMPILER_REVISION = COMPILER_REVISION;
   var REVISION_CHANGES = {
     1: '<= 1.0.rc.2', // 1.0.rc.2 is actually rev2 but doesn't report it
@@ -413,12 +413,13 @@ var __module2__ = (function(__dependency1__, __dependency2__) {
 })(__module3__, __module5__);
 
 // handlebars/runtime.js
-var __module6__ = (function(__dependency1__, __dependency2__) {
+var __module6__ = (function(__dependency1__, __dependency2__, __dependency3__) {
   "use strict";
   var __exports__ = {};
   var Exception = __dependency1__;
   var COMPILER_REVISION = __dependency2__.COMPILER_REVISION;
   var REVISION_CHANGES = __dependency2__.REVISION_CHANGES;
+  var Utils = __dependency3__;
 
   function checkRevision(compilerInfo) {
     var compilerRevision = compilerInfo && compilerInfo[0] || 1,
@@ -545,10 +546,12 @@ var __module6__ = (function(__dependency1__, __dependency2__) {
       throw new Exception("The partial " + name + " could not be found");
     } else if(partial instanceof Function) {
       return partial(context, options);
+    } else if (typeof partial === 'string') {
+      // String partials are compiled on-the-fly by invokePartialWrapper
+      return;
     } else {
-      // CVE-2019-20920, CVE-2019-20922: Prevent arbitrary code execution by ensuring we only execute functions, not strings
-      // Addresses potential RCE through string evaluation as code
-      throw new Exception("Partial must be a function");
+      // CVE-2019-20920: Prevent arbitrary code execution via non-string, non-function partials
+      throw new Exception("Partial must be a function or string");
     }
   }
 
@@ -556,7 +559,7 @@ var __module6__ = (function(__dependency1__, __dependency2__) {
 
   __exports__.noop = noop;
   return __exports__;
-})(__module5__, __module2__);
+})(__module5__, __module2__, __module3__);
 
 // handlebars.runtime.js
 var __module1__ = (function(__dependency1__, __dependency2__, __dependency3__, __dependency4__, __dependency5__) {
@@ -767,7 +770,9 @@ var __module7__ = (function(__dependency1__) {
         } else {
           // CVE-2019-19919, CVE-2021-23369: Prevent access to dangerous properties that could lead to prototype pollution or RCE
           // Addresses Snyk vulnerabilities: 534988, 469063, 173692, 1279029, 567742
-          if (part === '__proto__' || part === 'constructor' || part === 'prototype') {
+          if (part === '__proto__' || part === 'constructor' || part === 'prototype' ||
+              part === '__defineGetter__' || part === '__defineSetter__' ||
+              part === '__lookupGetter__' || part === '__lookupSetter__') {
             throw new Exception("Invalid path: " + original + " - cannot access dangerous property", this);
           }
           dig.push(part);
@@ -1354,10 +1359,11 @@ var __module8__ = (function(__dependency1__, __dependency2__) {
 })(__module9__, __module7__);
 
 // handlebars/compiler/compiler.js
-var __module10__ = (function(__dependency1__) {
+var __module10__ = (function(__dependency1__, __dependency2__) {
   "use strict";
   var __exports__ = {};
   var Exception = __dependency1__;
+  var extend = __dependency2__.extend;
 
   function Compiler() {}
 
@@ -1439,7 +1445,9 @@ var __module10__ = (function(__dependency1__) {
       this.depths = {list: []};
       this.options = options;
 
-      this.options.knownHelpers = extend(Object.create(null), {
+      var knownHelpers = this.options.knownHelpers || {};
+      this.options.knownHelpers = {};
+      extend(this.options.knownHelpers, {
         'helperMissing': true,
         'blockHelperMissing': true,
         'each': true,
@@ -1447,7 +1455,10 @@ var __module10__ = (function(__dependency1__) {
         'unless': true,
         'with': true,
         'log': true
-      }, this.options.knownHelpers);
+      });
+      if (knownHelpers) {
+        extend(this.options.knownHelpers, knownHelpers);
+      }
 
       return this.accept(program);
     },
@@ -1801,7 +1812,7 @@ var __module10__ = (function(__dependency1__) {
 
     // Validate input to prevent template injection attacks
     if (typeof input === 'string') {
-      // Block dangerous patterns that could lead to RCE
+      // CVE-2019-19919, CVE-2021-23369: Block dangerous patterns that could lead to RCE
       var dangerousPatterns = [
         /\{\{\s*(__proto__|constructor|prototype)/,
         /\{\{\s*[^}]*\.(constructor|__proto__|prototype)/,
@@ -1841,7 +1852,7 @@ var __module10__ = (function(__dependency1__) {
 
   __exports__.compile = compile;
   return __exports__;
-})(__module5__);
+})(__module5__, __module3__);
 
 // handlebars/compiler/javascript-compiler.js
 var __module11__ = (function(__dependency1__, __dependency2__) {

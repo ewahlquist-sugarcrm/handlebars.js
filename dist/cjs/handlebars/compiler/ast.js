@@ -166,7 +166,9 @@ var AST = {
       } else {
         // CVE-2019-19919, CVE-2021-23369: Prevent access to dangerous properties that could lead to prototype pollution or RCE
         // Addresses Snyk vulnerabilities: 534988, 469063, 173692, 1279029, 567742
-        if (part === '__proto__' || part === 'constructor' || part === 'prototype') {
+        if (part === '__proto__' || part === 'constructor' || part === 'prototype' ||
+            part === '__defineGetter__' || part === '__defineSetter__' ||
+            part === '__lookupGetter__' || part === '__lookupSetter__') {
           throw new Exception("Invalid path: " + original + " - cannot access dangerous property", this);
         }
         dig.push(part);

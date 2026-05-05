@@ -14,7 +14,7 @@ JavaScriptCompiler.prototype = {
   // PUBLIC API: You can override these methods in a subclass to provide
   // alternative compiled forms for name lookup and buffering semantics
   nameLookup: function(parent, name /* , type*/) {
-    const dangerousProperties = ['__defineGetter__','__defineSetter__','__lookupGetter__','__proto__', 'constructor', 'prototype'];
+    var dangerousProperties = ['__defineGetter__','__defineSetter__','__lookupGetter__','__proto__', 'constructor', 'prototype'];
 
     // CVE-2019-19919, CVE-2021-23369: Block dangerous properties altogether from being used to prevent prototype pollution and RCE
     // Addresses Snyk vulnerabilities: 534988, 469063, 173692, 1279029, 567742
@@ -854,7 +854,7 @@ JavaScriptCompiler.prototype = {
   },
 
   aliasable: function(name) {
-    let ret = this.aliases[name];
+    var ret = this.aliases[name];
     if (ret) {
       ret.referenceCount++;
       return ret;

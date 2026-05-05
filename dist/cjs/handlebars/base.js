@@ -1,9 +1,9 @@
 "use strict";
-var Utils = require("./utils")["default"];
+var Utils = require("./utils");
 var Exception = require("./exception")["default"];
 
-var VERSION = "4.7.8-sugarcrm";
-exports.VERSION = VERSION;var COMPILER_REVISION = 7;
+var VERSION = "4.7.9-sugarcrm";
+exports.VERSION = VERSION;var COMPILER_REVISION = 4;
 exports.COMPILER_REVISION = COMPILER_REVISION;
 var REVISION_CHANGES = {
   1: '<= 1.0.rc.2', // 1.0.rc.2 is actually rev2 but doesn't report it

@@ -1,8 +1,9 @@
 define(
-  ["../exception","exports"],
-  function(__dependency1__, __exports__) {
+  ["../exception","../utils","exports"],
+  function(__dependency1__, __dependency2__, __exports__) {
     "use strict";
     var Exception = __dependency1__["default"];
+    var extend = __dependency2__.extend;
 
     function Compiler() {}
 
@@ -73,14 +74,20 @@ define(
       guid: 0,
 
       compile: function(program, options) {
+        // CVE-2019-19919, CVE-2021-23369: Validate program structure to prevent injection attacks
+        // Addresses potential template injection and RCE vulnerabilities
+        if (!program || typeof program !== 'object') {
+          throw new Exception('Invalid template program structure');
+        }
+
         this.opcodes = [];
         this.children = [];
         this.depths = {list: []};
         this.options = options;
 
-        // These changes will propagate to the other compiler components
-        var knownHelpers = this.options.knownHelpers;
-        this.options.knownHelpers = {
+        var knownHelpers = this.options.knownHelpers || {};
+        this.options.knownHelpers = {};
+        extend(this.options.knownHelpers, {
           'helperMissing': true,
           'blockHelperMissing': true,
           'each': true,
@@ -88,11 +95,9 @@ define(
           'unless': true,
           'with': true,
           'log': true
-        };
+        });
         if (knownHelpers) {
-          for (var name in knownHelpers) {
-            this.options.knownHelpers[name] = knownHelpers[name];
-          }
+          extend(this.options.knownHelpers, knownHelpers);
         }
 
         return this.accept(program);
@@ -443,6 +448,22 @@ define(
     __exports__.precompile = precompile;function compile(input, options, env) {
       if (input == null || (typeof input !== 'string' && input.constructor !== env.AST.ProgramNode)) {
         throw new Exception("You must pass a string or Handlebars AST to Handlebars.compile. You passed " + input);
+      }
+
+      // Validate input to prevent template injection attacks
+      if (typeof input === 'string') {
+        // CVE-2019-19919, CVE-2021-23369: Block dangerous patterns that could lead to RCE
+        var dangerousPatterns = [
+          /\{\{\s*(__proto__|constructor|prototype)/,
+          /\{\{\s*[^}]*\.(constructor|__proto__|prototype)/,
+          /\{\{\s*[^}]*\[\s*["'](__proto__|constructor|prototype)["']\s*\]/
+        ];
+        
+        for (var i = 0; i < dangerousPatterns.length; i++) {
+          if (dangerousPatterns[i].test(input)) {
+            throw new Exception("Template contains dangerous pattern that could lead to security vulnerability");
+          }
+        }
       }
 
       options = options || {};

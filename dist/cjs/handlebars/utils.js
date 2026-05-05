@@ -99,7 +99,7 @@ exports.appendContextPath = appendContextPath;function isPropertySafe(name) {
   // CVE-2019-19919, CVE-2021-23369, CVE-2019-20920, CVE-2019-20922: Block dangerous properties
   // Addresses Snyk vulnerabilities: 534988, 469063, 173692, 1279029, 567742
   // Block dangerous properties that could lead to prototype pollution, RCE, or XSS
-  const dangerousProperties = ['__proto__', 'constructor', 'prototype', '__defineGetter__', '__defineSetter__', '__lookupGetter__', '__lookupSetter__'];
+  var dangerousProperties = ['__proto__', 'constructor', 'prototype', '__defineGetter__', '__defineSetter__', '__lookupGetter__', '__lookupSetter__'];
   return dangerousProperties.indexOf(name) === -1;
 }
 
