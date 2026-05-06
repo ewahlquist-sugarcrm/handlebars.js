@@ -56,6 +56,7 @@
     "handlebars": "bin/handlebars"
   },
   "scripts": {
-    "test": "grunt"
+    "test": "grunt",
+    "prepublishOnly": "grunt"
   }
 }
