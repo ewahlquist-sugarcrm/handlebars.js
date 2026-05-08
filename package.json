@@ -1,7 +1,7 @@
 {
   "name": "handlebars",
   "barename": "handlebars",
-  "version": "4.7.8-sugarcrm",
+  "version": "4.7.9-sugarcrm",
   "description": "Handlebars provides the power necessary to let you build semantic templates effectively with no frustration",
   "homepage": "http://www.handlebarsjs.com/",
   "keywords": [
@@ -56,6 +56,7 @@
     "handlebars": "bin/handlebars"
   },
   "scripts": {
-    "test": "grunt"
+    "test": "grunt",
+    "prepublishOnly": "grunt"
   }
 }

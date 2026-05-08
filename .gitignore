@@ -8,5 +8,4 @@ node_modules
 *.sublime-workspace
 npm-debug.log
 sauce_connect.log*
-dist/cdnjs/*
-dist/components/*
+/dist/
